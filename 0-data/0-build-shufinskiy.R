@@ -53,8 +53,7 @@ upsert_db <- function(con, data, tbl_name) {
 
 # Create the nbastats table
 dbSendQuery(duck_con,
-            "DROP TABLE IF EXISTS nbastats;
-            CREATE TABLE nbastats (
+            "CREATE TABLE IF NOT EXISTS nbastats (
               PRIMARY KEY (game_id, eventnum),
               game_id VARCHAR,
               eventnum INTEGER,
@@ -133,15 +132,24 @@ nbastats_files <- dir("0-data/shufinskiy/raw/nbastats/",
                       pattern = "*.csv",
                       full.names = T)
 
-map(nbastats_files, function(x, topic = "nbastats") {
-  temp_csv <- read_csv(x, col_types = nbastats_types) |> 
-    mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0")) |> 
-    distinct() |> 
-    rename_all(tolower)
-  upsert_db(con = duck_con,
-            data = temp_csv,
-            tbl_name = topic)
-  print(x)
+existing_game_ids <- tbl(duck_con, "nbastats") |> 
+  select(game_id) |>
+  distinct() |>
+  collect()
+
+nbastats_files |> 
+  map(function(x, topic = "nbastats") {
+    print(x)
+    temp_csv <- read_csv(x, col_types = nbastats_types) |> 
+      mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0")) |> 
+      distinct() |> 
+      rename_all(tolower)
+    temp_csv |> 
+      filter(!game_id %in% existing_game_ids$game_id) |> 
+      upsert_db(con = duck_con,
+                data = _,
+                tbl_name = topic)
+    gc()
 })
 
 dbGetQuery(duck_con, "SELECT COUNT(*) FROM nbastats")
@@ -169,7 +177,7 @@ eventmsgtype_cross <- c("1" = "made_shot",
                         "13" = "end_period",
                         "18" = "")
 
-event_cross <- read_csv("0-data/raw/template_for_crosswalk.csv") |> 
+event_cross <- read_csv("0-data/internal/template_for_crosswalk.csv") |> 
   rename_all(tolower)
 
 event_messages <- all_events |> 
@@ -177,7 +185,7 @@ event_messages <- all_events |>
   left_join(event_cross) |> 
   arrange(eventmsgtype, eventmsgactiontype)
 
-write_csv(event_messages, file = "0-data/raw/crosswalk_to_do.csv")
+write_csv(event_messages, file = "0-data/internal/crosswalk_to_do.csv")
 
 dbSendQuery(duck_con, "DROP TABLE IF EXISTS event_messages;
             CREATE TABLE event_messages (
