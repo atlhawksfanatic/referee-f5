@@ -33,4 +33,4 @@ docs/
 po/*~
 # RStudio Connect folder
 rsconnect/
-referee-f5.Rproj
+*.Rproj
