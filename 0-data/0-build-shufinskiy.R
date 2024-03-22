@@ -129,7 +129,7 @@ nbastats_types <- cols(
   VIDEO_AVAILABLE_FLAG = "numeric"
   )
 
-nbastats_files <- dir("0-data/raw/nbastats/",
+nbastats_files <- dir("0-data/shufinskiy/raw/nbastats/",
                       pattern = "*.csv",
                       full.names = T)
 
