@@ -20,17 +20,17 @@ duck_con <- dbConnect(
 
 dbListTables(duck_con)
 
-duck_games <- tbl(duck_con, from = "nbastats")
+# duck_games <- tbl(duck_con, from = "nbastats")
 
 ref_regex <- "\\(([[:print:]]+)\\).*\\(([[:print:]]+)\\)"
 neutral_regex <- str_glue("{ref_regex}?.*\\(([[:print:]]+)\\)")
 
 # Get messages where a ref was potentially involved in a foul call
-potential_fouls <- duck_games |> 
+potential_fouls <- tbl(duck_con, from = "nbastats") |> 
   left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
   left_join(tbl(duck_con, "ref_box")) |> 
   left_join(tbl(duck_con, "event_messages")) |> 
-  filter(season > 2014) |> 
+  filter(season > 2014) |>
   filter(grepl(ref_regex, homedescription) |
            grepl(ref_regex, neutraldescription) |
            grepl(ref_regex, visitordescription),
@@ -48,14 +48,24 @@ identify_ref <- potential_fouls |>
     ref = ifelse(var == "neutraldescription",
                  str_extract(val, neutral_regex, group = 3),
                  str_extract(val, ref_regex, group = 2)),
+    ref_match = str_replace(ref, "([A-Z]?)([[:graph:]]*) (.*)", "\\1.\\3") |> 
+      str_replace("\\s", "") |> 
+      str_to_upper(),
     ref_last = str_extract(ref, "[^.]+$")
     )
 
 ref_crosswalk <- identify_ref |> 
   select(game_id, official_1, official_2, official_3, official_4) |> 
   distinct() |> 
-  pivot_longer(-game_id, names_to = "position", values_to = "official") |> 
-  mutate(ref = str_replace(official, "([a-z]+) ", "."))
+  pivot_longer(-game_id,
+               names_to = "position",
+               values_to = "official") |> 
+  filter(!is.na(official)) |> 
+  mutate(ref_match = str_replace(official,
+                                 "([A-Z]?)([[:graph:]]*) (.*)",
+                                 "\\1.\\3") |> 
+           str_replace("\\s", "") |> 
+           str_to_upper())
 
 temp_ref <- identify_ref |> 
   left_join(ref_crosswalk) 
