@@ -126,7 +126,7 @@ nbastats_types <- cols(
   PLAYER3_TEAM_NICKNAME = "character",
   PLAYER3_TEAM_ABBREVIATION = "character",
   VIDEO_AVAILABLE_FLAG = "numeric"
-  )
+)
 
 nbastats_files <- dir("0-data/shufinskiy/raw/nbastats/",
                       pattern = "*.csv",
@@ -150,7 +150,7 @@ nbastats_files |>
                 data = _,
                 tbl_name = topic)
     gc()
-})
+  })
 
 dbGetQuery(duck_con, "SELECT COUNT(*) FROM nbastats")
 dbGetQuery(duck_con, "DESCRIBE nbastats")
@@ -205,76 +205,115 @@ dbGetQuery(duck_con, "SELECT COUNT(*) FROM event_messages")
 dbGetQuery(duck_con, "DESCRIBE event_messages")
 
 
-# # ---- datanba ------------------------------------------------------------
-# 
-# # Create the datanba table
-# dbSendQuery(duck_con, "DROP TABLE IF EXISTS datanba;
-# CREATE TABLE datanba (
-#     evt BIGINT,
-#     wallclk TIMESTAMP,
-#     cl VARCHAR,
-#     de VARCHAR,
-#     locX BIGINT,
-#     locY BIGINT,
-#     opt1 BIGINT,
-#     opt2 BIGINT,
-#     opt3 BIGINT,
-#     opt4 BIGINT,
-#     mtype BIGINT,
-#     etype BIGINT,
-#     opid BIGINT,
-#     tid BIGINT,
-#     pid BIGINT,
-#     hs BIGINT,
-#     vs BIGINT,
-#     epid BIGINT,
-#     oftid BIGINT,
-#     PERIOD BIGINT,
-#     GAME_ID VARCHAR,
-#     ord BIGINT,
-#     pts BIGINT
-#     );
-# ")
-# 
-# datanba_types <- cols(
-#   evt = "d",
-#   wallclk = "T",
-#   cl = "t",
-#   de = "c",
-#   locX = "d",
-#   locY = "d",
-#   opt1 = "d",
-#   opt2 = "d",
-#   opt3 = "d",
-#   opt4 = "d",
-#   mtype = "d",
-#   etype = "d",
-#   opid = "d",
-#   tid = "d",
-#   pid = "d",
-#   hs = "d",
-#   vs = "d",
-#   epid = "d",
-#   oftid = "d",
-#   PERIOD = "d",
-#   GAME_ID = "c",
-#   ord = "d",
-#   pts = "d"
-# )
-# 
-# datanba_files <- dir("0-data/raw/datanba/",
-#                      pattern = "*.csv", 
-#                      full.names = T)
-# 
-# map(datanba_files, function(x, topic = "datanba") {
-#   temp_csv <- read_csv(x, col_types = datanba_types) |> 
-#     mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0"))
-#   upsert_db(con = duck_con,
-#             data = temp_csv,
-#             tbl_name = topic)
-#   print(x)
-# })
-# 
-# 
-# dbGetQuery(duck_con, "SELECT COUNT(*) FROM datanba")
-# 
+# ---- datanba ------------------------------------------------------------
+
+# Create the datanba table
+dbSendQuery(duck_con, "DROP TABLE IF EXISTS datanba;
+CREATE TABLE datanba (
+    PRIMARY KEY (GAME_ID, evt),
+    evt INTEGER,
+    wallclk TIMESTAMP,
+    cl TIME,
+    de VARCHAR,
+    locX INTEGER,
+    locY INTEGER,
+    opt1 INTEGER,
+    opt2 INTEGER,
+    opt3 INTEGER,
+    opt4 INTEGER,
+    mtype INTEGER,
+    etype INTEGER,
+    opid INTEGER,
+    tid INTEGER,
+    pid INTEGER,
+    hs INTEGER,
+    vs INTEGER,
+    epid INTEGER,
+    oftid INTEGER,
+    PERIOD INTEGER,
+    GAME_ID VARCHAR,
+    ord INTEGER,
+    pts INTEGER
+    );
+")
+
+datanba_types <- cols(
+  evt = "d",
+  wallclk = "T",
+  cl = "t",
+  de = "c",
+  locX = "d",
+  locY = "d",
+  opt1 = "d",
+  opt2 = "d",
+  opt3 = "d",
+  opt4 = "d",
+  mtype = "d",
+  etype = "d",
+  opid = "d",
+  tid = "d",
+  pid = "d",
+  hs = "d",
+  vs = "d",
+  epid = "d",
+  oftid = "d",
+  PERIOD = "d",
+  GAME_ID = "c",
+  ord = "d",
+  pts = "d"
+)
+
+datanba_files <- dir("0-data/shufinskiy/raw/datanba/",
+                     pattern = "*.csv",
+                     full.names = T)
+
+map(datanba_files, function(x, topic = "datanba") {
+  temp_csv <- read_csv(x, col_types = datanba_types) |>
+    mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0"))
+  
+  upsert_db(con = duck_con,
+            data = temp_csv,
+            tbl_name = topic)
+  print(x)
+})
+
+
+dbGetQuery(duck_con, "SELECT COUNT(*) FROM datanba")
+dbGetQuery(duck_con, "DESCRIBE datanba")
+
+
+# ---- datanba-msgs -------------------------------------------------------
+
+
+datanba_events <- tbl(duck_con, "datanba") |> 
+  select(etype, mtype) |> 
+  distinct() |> 
+  collect()
+
+etype_cross <- c("1" = "made_shot",
+                 "2" = "missed_shot",
+                 "3" = "free_throw",
+                 "4" = "rebound",
+                 "5" = "turnover",
+                 "6" = "foul",
+                 "7" = "violation",
+                 "8" = "substitution",
+                 "9" = "timeout",
+                 "10" = "jumpball",
+                 "11" = "ejection",
+                 "12" = "start_period",
+                 "13" = "end_period",
+                 "18" = "instant_replay",
+                 "20" = "stoppage")
+
+event_cross <- read_csv("0-data/internal/template_for_crosswalk.csv") |> 
+  rename_all(tolower)
+
+datanba_messages <- datanba_events |> 
+  mutate(etype_desc = etype_cross[as.character(etype)]) |> 
+  left_join(event_cross, by = c("etype" = "eventmsgtype",
+                                "mtype" = "eventmsgactiontype")) |> 
+  arrange(etype, mtype)
+
+write_csv(datanba_messages,
+          file = "0-data/internal/crosswalk_to_do_datanba.csv")
