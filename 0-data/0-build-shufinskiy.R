@@ -208,34 +208,34 @@ dbGetQuery(duck_con, "DESCRIBE event_messages")
 # ---- datanba ------------------------------------------------------------
 
 # Create the datanba table
-dbSendQuery(duck_con, "DROP TABLE IF EXISTS datanba;
-CREATE TABLE datanba (
-    PRIMARY KEY (GAME_ID, evt),
-    evt INTEGER,
-    wallclk TIMESTAMP,
-    cl TIME,
-    de VARCHAR,
-    locX INTEGER,
-    locY INTEGER,
-    opt1 INTEGER,
-    opt2 INTEGER,
-    opt3 INTEGER,
-    opt4 INTEGER,
-    mtype INTEGER,
-    etype INTEGER,
-    opid INTEGER,
-    tid INTEGER,
-    pid INTEGER,
-    hs INTEGER,
-    vs INTEGER,
-    epid INTEGER,
-    oftid INTEGER,
-    PERIOD INTEGER,
-    GAME_ID VARCHAR,
-    ord INTEGER,
-    pts INTEGER
-    );
-")
+dbSendQuery(duck_con,
+            "CREATE TABLE IF NOT EXISTS datanba (
+            PRIMARY KEY (GAME_ID, evt),
+            evt INTEGER,
+            wallclk TIMESTAMP,
+            cl TIME,
+            de VARCHAR,
+            locx INTEGER,
+            locy INTEGER,
+            opt1 INTEGER,
+            opt2 INTEGER,
+            opt3 INTEGER,
+            opt4 INTEGER,
+            mtype INTEGER,
+            etype INTEGER,
+            opid INTEGER,
+            tid INTEGER,
+            pid INTEGER,
+            hs INTEGER,
+            vs INTEGER,
+            epid INTEGER,
+            oftid INTEGER,
+            period INTEGER,
+            game_id VARCHAR,
+            ord INTEGER,
+            pts INTEGER
+            );"
+            )
 
 datanba_types <- cols(
   evt = "d",
@@ -267,14 +267,23 @@ datanba_files <- dir("0-data/shufinskiy/raw/datanba/",
                      pattern = "*.csv",
                      full.names = T)
 
+existing_game_ids <- tbl(duck_con, "datanba") |> 
+  select(game_id) |>
+  distinct() |>
+  collect()
+
 map(datanba_files, function(x, topic = "datanba") {
-  temp_csv <- read_csv(x, col_types = datanba_types) |>
-    mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0"))
-  
-  upsert_db(con = duck_con,
-            data = temp_csv,
-            tbl_name = topic)
   print(x)
+  temp_csv <- read_csv(x, col_types = datanba_types) |>
+    mutate(GAME_ID = str_pad(GAME_ID, 10, side = "left", pad = "0")) |> 
+    rename_all(tolower)
+  
+  temp_csv |> 
+    filter(!game_id %in% existing_game_ids$game_id) |> 
+    upsert_db(con = duck_con,
+              data = _,
+              tbl_name = topic)
+  gc()
 })
 
 
@@ -288,6 +297,7 @@ dbGetQuery(duck_con, "DESCRIBE datanba")
 datanba_events <- tbl(duck_con, "datanba") |> 
   select(etype, mtype) |> 
   distinct() |> 
+  arrange(etype, mtype) |> 
   collect()
 
 etype_cross <- c("1" = "made_shot",
@@ -306,14 +316,31 @@ etype_cross <- c("1" = "made_shot",
                  "18" = "instant_replay",
                  "20" = "stoppage")
 
-event_cross <- read_csv("0-data/internal/template_for_crosswalk.csv") |> 
+event_cross <- read_csv("0-data/internal/template_for_datanba.csv") |> 
   rename_all(tolower)
 
 datanba_messages <- datanba_events |> 
   mutate(etype_desc = etype_cross[as.character(etype)]) |> 
-  left_join(event_cross, by = c("etype" = "eventmsgtype",
-                                "mtype" = "eventmsgactiontype")) |> 
+  left_join(event_cross) |> 
   arrange(etype, mtype)
 
 write_csv(datanba_messages,
           file = "0-data/internal/crosswalk_to_do_datanba.csv")
+
+dbSendQuery(duck_con, "DROP TABLE IF EXISTS event_messages_datanba;
+            CREATE TABLE event_messages_datanba (
+              PRIMARY KEY (etype, mtype),
+              etype INTEGER,
+              etype_desc VARCHAR,
+              mtype INTEGER,
+              mtype_desc VARCHAR,
+            );")
+dbGetQuery(duck_con, "SELECT COUNT(*) FROM event_messages_datanba")
+
+dbWriteTable(duck_con,
+             name = "event_messages_datanba",
+             value = datanba_messages,
+             append = TRUE)
+
+dbGetQuery(duck_con, "SELECT COUNT(*) FROM event_messages_datanba")
+dbGetQuery(duck_con, "DESCRIBE event_messages_datanba")
