@@ -160,9 +160,9 @@ szns |>
       ", ")
     
     create_ref_violations <-
-      glue::glue("DROP TABLE IF EXISTS ref_violations_datanba;
-             CREATE TABLE ref_violations_datanba ({ref_duck_vars}, ",
-                 "PRIMARY KEY(game_id, evt))")
+      glue::glue(
+        "CREATE TABLE IF NOT EXISTS ref_violations_datanba ({ref_duck_vars}, ",
+        "PRIMARY KEY(game_id, evt))")
     dbSendQuery(duck_con, create_ref_violations)
     
     # Write data to table
