@@ -132,10 +132,14 @@ nbastats_files <- dir("0-data/shufinskiy/raw/nbastats/",
                       pattern = "*.csv",
                       full.names = T)
 
-existing_game_ids <- tbl(duck_con, "nbastats") |> 
-  select(game_id) |>
-  distinct() |>
-  collect()
+if (dbExistsTable(duck_con, "nbastats")) {
+  existing_game_ids <- tbl(duck_con, "nbastats") |> 
+    select(game_id) |>
+    distinct() |>
+    collect()
+} else {
+  existing_game_ids <- data.frame(game_id = NA)
+}
 
 nbastats_files |> 
   map(function(x, topic = "nbastats") {
@@ -267,10 +271,15 @@ datanba_files <- dir("0-data/shufinskiy/raw/datanba/",
                      pattern = "*.csv",
                      full.names = T)
 
-existing_game_ids <- tbl(duck_con, "datanba") |> 
-  select(game_id) |>
-  distinct() |>
-  collect()
+if (dbExistsTable(duck_con, "datanba")) {
+  existing_game_ids <- tbl(duck_con, "datanba") |> 
+    select(game_id) |>
+    distinct() |>
+    collect()
+} else {
+  existing_game_ids <- data.frame(game_id = NA)
+}
+
 
 map(datanba_files, function(x, topic = "datanba") {
   print(x)
