@@ -47,7 +47,7 @@ szns |>
       left_join(tbl(duck_con, "ref_box")) |> 
       left_join(tbl(duck_con, "event_messages_datanba")) |> 
       filter(season == x) |>
-      filter(grepl(foul_regex, de),
+      filter(grepl(violation_regex, de),
              etype == 6) |> 
       collect()
     
@@ -55,10 +55,12 @@ szns |>
       select(game_id, contains("type"), evt, de,
              official_1, official_2, official_3, official_4) |> 
       mutate(
-        maybe_ref = str_extract(de, foul_regex, group = 2)
+        maybe_ref = str_extract(de, foul_regex, group = 2),
+        reffy = str_extract(de, violation_regex, group = 1)
       ) |> 
       mutate(ref = case_when(grepl("Drell", maybe_ref) ~ "I Hwang",
                              grepl("[0-9]", maybe_ref) ~ NA_character_,
+                             is.na(maybe_ref) ~ reffy,
                              T ~ maybe_ref),
              ref_match = toupper(ref))
     
@@ -77,7 +79,9 @@ szns |>
     
     ref_fouls <- identify_fouls |> 
       left_join(foul_crosswalk) |> 
-      select(game_id, evt, etype, mtype,
+      select(game_id, evt,
+             etype, etype_desc,
+             mtype, mtype_desc,
              position, official)
     
     foul_vars <- sapply(ref_fouls, class) |> 
@@ -147,7 +151,9 @@ szns |>
     
     ref_violations <- identify_violation |> 
       left_join(violation_crosswalk) |> 
-      select(game_id, evt, etype, mtype,
+      select(game_id, evt,
+             etype, etype_desc,
+             mtype, mtype_desc,
              position, official)
     
     violation_vars <- sapply(ref_violations, class) |> 
