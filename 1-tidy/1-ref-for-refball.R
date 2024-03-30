@@ -69,6 +69,16 @@ datanba_games <- tbl(duck_con, "ref_fouls_datanba") |>
   summarise(total_games = n_distinct(game_id)) |> 
   collect()
 
+datanba_league_z <- tbl(duck_con, "ref_fouls_datanba") |> 
+  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
+  filter(season > 2015) |> 
+  group_by(game_id) |> 
+  mutate(officials = n_distinct(official)) |> 
+  group_by(season, season_prefix, game_id, officials,
+           etype_desc, mtype_desc) |> 
+  summarise(calls = n()) |> 
+  collect()
+
 
 
 # ---- join ---------------------------------------------------------------
@@ -102,7 +112,7 @@ shiny_ref_vars <- c(Referee = "official",
                     "Offensive charge" = "foul_offensive_charge",
                     Offensive = "foul_offensive",
                     "Kicked ball" = "violation_kicked_ball",
-                    Technical ="foul_technical",
+                    Technical = "foul_technical",
                     "Defensive goaltending" =
                       "violation_defensive_goaltending",
                     "Shooting block" = "foul_shooting_block",
@@ -131,6 +141,73 @@ shiny_ref_vars <- c(Referee = "official",
 
 datanba_calls |> 
   select(season, season_prefix,
-         shiny_ref_vars) |> 
+         all_of(shiny_ref_vars)) |> 
   mutate(across(everything(), ~replace_na(.x, 0))) |> 
   write_csv("2-shiny/refball/datanba_szn_calls.csv")
+
+ggplot_vars <- c(Referee = "official",
+                 Games	= "total_games",
+                 "Total fouls" = "total_calls",
+                 Technical ="foul_technical",
+                 "Shooting" = "foul_shooting",
+                 "Personal" = "foul_personal",
+                 "Loose ball" = "foul_loose_ball",
+                 "Offensive charge" = "foul_offensive_charge",
+                 Offensive = "foul_offensive",
+                 "Defensive goaltending" =
+                   "violation_defensive_goaltending",
+                 "Defensive 3 seconds" = "foul_defensive_three_second")
+
+gg_totals <- datanba_calls |> 
+  ungroup() |> 
+  filter(season_prefix != "004", total_games > 9) |>
+  select(all_of(ggplot_vars)) |> 
+  group_by(Referee) |> 
+  summarise_all(~sum(., na.rm = T)) |> 
+  mutate(across(c(-Referee, -Games), ~.x/Games)) |>
+  pivot_longer(c(-Referee, -Games),
+               names_to = "var", values_to = "val") |> 
+  group_by(var) |> 
+  mutate(league_avg = mean(val, na.rm = T),
+         z = scale(val)[,1])
+
+datanba_calls |> 
+  ungroup() |> 
+  filter(season_prefix != "004", total_games > 9) |>
+  select(season, all_of(ggplot_vars)) |> 
+  group_by(season, Referee) |> 
+  mutate(across(c(-Games), ~.x/Games)) |>
+  pivot_longer(c(-season, -Referee, -Games),
+               names_to = "var", values_to = "val") |> 
+  group_by(var) |> 
+  group_by(season, var) |> 
+  mutate(league_avg = mean(val, na.rm = T),
+         z = scale(val)[,1]) |> 
+  bind_rows(gg_totals) |> 
+  mutate(season_alpha = ifelse(is.na(season),
+                               str_glue("{min(datanba_calls$season)-1}-{max(datanba_calls$season)}"),
+                               str_glue("{min(season)-1}-{max(season)}"))) |> 
+  write_csv("2-shiny/refball/datanba_ggplot.csv")
+
+
+# ---- teams --------------------------------------------------------------
+
+# datanba
+datanba_foul_team_calls <- tbl(duck_con, "ref_fouls_datanba") |> 
+  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
+  filter(season > 2015) |> 
+  select(game_id, home, away, evt, official, etype_desc, mtype_desc) |>
+  collect()
+
+datanba_foul_team_calls |> 
+  filter(!is.na(official)) |> 
+  pivot_longer(c(home, away),
+               names_to = "side",
+               values_to = "team") |>
+  group_by(Referee = official, Team = team) |> 
+  summarise(Games = n_distinct(game_id),
+            "Total fouls" = n() / Games,
+            Shooting = sum(mtype_desc == "shooting") / Games,
+            Personal = sum(mtype_desc == "personal") / Games,
+            Technical = sum(mtype_desc == "technical") / Games) |> 
+  write_csv("2-shiny/refball/datanba_ref_teams.csv")
