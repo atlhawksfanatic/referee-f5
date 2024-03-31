@@ -23,28 +23,28 @@ dbListTables(duck_con)
 
 # ---- calls --------------------------------------------------------------
 
-ref_foul_calls <- tbl(duck_con, "ref_fouls") |> 
-  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
-  filter(season > 2015) |> 
-  group_by(season, season_prefix, official,
-           eventmsgtype_desc, eventmsgactiontype_desc) |> 
-  summarise(calls = n()) |> 
-  collect()
-
-ref_violation_calls <- tbl(duck_con, "ref_violations") |> 
-  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
-  filter(season > 2015) |> 
-  group_by(season, season_prefix, official,
-           eventmsgtype_desc, eventmsgactiontype_desc) |> 
-  summarise(calls = n()) |> 
-  collect()
-
-ref_games <- tbl(duck_con, "ref_fouls") |> 
-  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
-  filter(season > 2015) |> 
-  group_by(season, season_prefix, official) |> 
-  summarise(total_games = n_distinct(game_id)) |> 
-  collect()
+# ref_foul_calls <- tbl(duck_con, "ref_fouls") |> 
+#   left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
+#   filter(season > 2015) |> 
+#   group_by(season, season_prefix, official,
+#            eventmsgtype_desc, eventmsgactiontype_desc) |> 
+#   summarise(calls = n()) |> 
+#   collect()
+# 
+# ref_violation_calls <- tbl(duck_con, "ref_violations") |> 
+#   left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
+#   filter(season > 2015) |> 
+#   group_by(season, season_prefix, official,
+#            eventmsgtype_desc, eventmsgactiontype_desc) |> 
+#   summarise(calls = n()) |> 
+#   collect()
+# 
+# ref_games <- tbl(duck_con, "ref_fouls") |> 
+#   left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
+#   filter(season > 2015) |> 
+#   group_by(season, season_prefix, official) |> 
+#   summarise(total_games = n_distinct(game_id)) |> 
+#   collect()
 
 # datanba
 datanba_foul_calls <- tbl(duck_con, "ref_fouls_datanba") |> 
@@ -70,27 +70,15 @@ datanba_games <- tbl(duck_con, "ref_fouls_datanba") |>
   summarise(total_games = n_distinct(game_id)) |> 
   collect()
 
-datanba_league_z <- tbl(duck_con, "ref_fouls_datanba") |> 
-  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |> 
-  filter(season > 2015) |> 
-  group_by(game_id) |> 
-  mutate(officials = n_distinct(official)) |> 
-  group_by(season, season_prefix, game_id, officials,
-           etype_desc, mtype_desc) |> 
-  summarise(calls = n()) |> 
-  collect()
-
-
-
 # ---- join ---------------------------------------------------------------
 
-(ref_calls <- bind_rows(ref_foul_calls, ref_violation_calls) |> 
-   pivot_wider(names_from = c(eventmsgtype_desc, eventmsgactiontype_desc),
-               values_from = calls) |> 
-   arrange(season, season_prefix, official) |> 
-   left_join(ref_games) |> 
-   mutate(total_calls = rowSums(across(matches("foul|violation")),
-                                na.rm = T)))
+# (ref_calls <- bind_rows(ref_foul_calls, ref_violation_calls) |> 
+#    pivot_wider(names_from = c(eventmsgtype_desc, eventmsgactiontype_desc),
+#                values_from = calls) |> 
+#    arrange(season, season_prefix, official) |> 
+#    left_join(ref_games) |> 
+#    mutate(total_calls = rowSums(across(matches("foul|violation")),
+#                                 na.rm = T)))
 
 (datanba_calls <- bind_rows(datanba_foul_calls, datanba_violation_calls) |> 
     pivot_wider(names_from = c(etype_desc, mtype_desc),
@@ -159,6 +147,7 @@ ggplot_vars <- c(Referee = "official",
                    "violation_defensive_goaltending",
                  "Defensive 3 seconds" = "foul_defensive_three_second")
 
+
 gg_totals <- datanba_calls |> 
   ungroup() |> 
   filter(season_prefix != "004", total_games > 9) |>
@@ -183,11 +172,13 @@ datanba_calls |>
   group_by(var) |> 
   group_by(season, var) |> 
   mutate(league_avg = mean(val, na.rm = T),
-         z = scale(val)[,1]) |> 
+         z = scale(val)[,1]) |>
   bind_rows(gg_totals) |> 
-  mutate(season_alpha = ifelse(is.na(season),
-                               str_glue("{min(datanba_calls$season)-1}-{max(datanba_calls$season)}"),
-                               str_glue("{min(season)-1}-{max(season)}"))) |> 
+  mutate(season_alpha =
+           ifelse(is.na(season),
+                  str_glue("{min(datanba_calls$season)-1}-",
+                           "{max(datanba_calls$season)}"),
+                  str_glue("{min(season)-1}-{max(season)}"))) |>
   write_csv("2-shiny/refball/datanba_ggplot_shufinskiy.csv")
 
 
