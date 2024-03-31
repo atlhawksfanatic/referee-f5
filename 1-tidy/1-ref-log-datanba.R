@@ -16,7 +16,8 @@ if (!dir.exists(local_dir)) dir.create(local_dir, recursive = T)
 
 # Connect to or start the DB
 duck_con <- dbConnect(
-  duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  # duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  duckdb(dbdir = str_glue("{local_dir}/shufinskiy.duckdb"))
 )
 
 duck_types_cross <- c("character" = "VARCHAR",
@@ -210,7 +211,7 @@ na_officialz |>
 
 na_officialz |> 
   filter(ref_match %in% c("T MADDOX", "B TAYLOR", "T BROTHERS")) |> 
-  View()
+  glimpse()
 
 tbl(duck_con, "ref_box") |> 
   filter(game_id == "0042000133") |> 

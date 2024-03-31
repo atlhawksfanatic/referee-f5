@@ -19,7 +19,8 @@ close(filecon)
 
 # Connect to or start the DB
 duck_con <- dbConnect(
-  duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  # duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  duckdb(dbdir = str_glue("{local_dir}/shufinskiy.duckdb"))
 )
 
 duck_types_cross <- c("character" = "VARCHAR",

@@ -13,7 +13,7 @@ raw_dirs <- list.dirs("0-data/shufinskiy/raw",
 
 # Connect to or start the DB
 duck_con <- dbConnect(
-  duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  duckdb(dbdir = str_glue("{local_dir}/shufinskiy.duckdb"))
 )
 
 # ignore duckdb folders

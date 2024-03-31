@@ -1,7 +1,60 @@
+# https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_0042000133.json
 
 library(bslib)
 library(shiny)
 library(shinythemes)
+library(tidyverse)
+library(DT)
+
+# ref_calls <- read_csv("2-shiny/refball/datanba_szn_calls_shufinskiy.csv") |> 
+#   filter(!is.na(Referee))
+ref_calls <- read_csv("datanba_szn_calls_shufinskiy.csv") |> 
+  filter(!is.na(Referee))
+# ref_teams <- read_csv("2-shiny/refball/datanba_ref_teams_shufinskiy.csv")
+ref_teams <- read_csv("datanba_ref_teams_shufinskiy.csv")
+
+ref_totals <- ref_calls |> 
+  mutate(season_alpha = str_glue("{min(season)-1}-{max(season)}"),
+         season_type = ifelse(season_prefix == "002",
+                              "Regular Season",
+                              "Playoffs")) |> 
+  select(-season_prefix, -season) |> 
+  group_by(season_type, Referee, season_alpha) |> 
+  summarise_all(sum, na.rm = T)
+
+ref_temp <- ref_calls |>
+  mutate(season_alpha = str_glue("{season-1}-{season-2000}"),
+         season_type = ifelse(season_prefix == "002",
+                              "Regular Season",
+                              "Playoffs")) |> 
+  bind_rows(ref_totals) |> 
+  mutate(mode = "Total")
+
+
+ref_shiny <- ref_temp |> 
+  mutate(across(`Total fouls`:`Too many players technical`,
+                ~round(.x/Games, digits = 2)),
+         mode = "Per Game") |> 
+  bind_rows(ref_temp)
+
+
+szn_opts <- sort(unique(ref_shiny$season_alpha), decreasing = T)
+szn_opts <- c(szn_opts[-which.max(nchar(szn_opts))],
+              szn_opts[which.max(nchar(szn_opts))])
+szn_type_opts <- unique(ref_shiny$season_type)
+mode_opts <- c("Total", "Per Game")
+
+referee_opts <- unique(ref_shiny$Referee, na.rm = T)
+
+# custom ggplot2 theme
+theme_owen <- function () { 
+  theme_minimal(base_size=9, base_family="Consolas") %+replace% 
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.background = element_rect(fill = 'floralwhite',
+                                     color = "floralwhite")
+    )
+}
 
 ui <- page_navbar(
   title = "Ref Ball",
@@ -18,7 +71,14 @@ ui <- page_navbar(
             h5(a("Current iteration", href="https://github.com/atlhawksfanatic/referee-f5"),
                " created by ",
                a("robert", href="https://twitter.com/atlhawksfanatic")),
-            p("First page content.")),
+            fluidRow(
+              column(width = 1, selectInput("season_alpha", "Season:", szn_opts)),
+              column(width = 1, selectInput("season_type", "Season Type:", szn_type_opts)),
+              column(width = 1, selectInput("mode", "Mode:", mode_opts)),
+              column(width = 2, downloadButton("download_data", "Download Data"))
+            ),
+            dataTableOutput("dynamic")
+            ),
   
   nav_panel(title = "Referee Comparison Tool",
             titlePanel("Referee Comparison Tool"),
@@ -42,7 +102,13 @@ ui <- page_navbar(
             h5(a("Current iteration", href="https://github.com/atlhawksfanatic/referee-f5"),
                " created by ",
                a("robert", href="https://twitter.com/atlhawksfanatic")),
-            p("Third page content.")),
+            fluidRow(
+              column(width = 5, sliderInput("slider", "Minimum Games:",
+                                            min = 1, max = max(ref_teams$Games),
+                                            value = 10))
+            ),
+            dataTableOutput("ref_teams")
+            ),
   nav_spacer(),
   nav_menu(
     title = "Links",
@@ -74,18 +140,24 @@ ui <- page_navbar(
 #     )
 #   )
 
+
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-  output$distPlot <- renderPlot({
-    # generate bins based on input$bins from ui.R
-    x    <- faithful[, 2]
-    bins <- seq(min(x), max(x), length.out = input$bins + 1)
-    
-    # draw the histogram with the specified number of bins
-    hist(x, breaks = bins, col = 'darkgray', border = 'white',
-         xlab = 'Waiting time to next eruption (in mins)',
-         main = 'Histogram of waiting times')
-  })
+  output$dynamic <- renderDataTable({
+    ref_shiny |> 
+      filter(season_alpha == input$season_alpha,
+             season_type == input$season_type,
+             mode == input$mode) |> 
+      select(Referee:`Too many players technical`)
+  }, options = list(pageLength = 100))
+  
+  output$ref_teams <- renderDataTable({
+    ref_teams |> 
+      filter(Games >= input$slider) |> 
+      mutate(across(c(-Referee, -Team, -Games),
+                    ~round(.x, digits = 2)))
+  }, options = list(pageLength = 100))
+
 }
 
 # Run the application 

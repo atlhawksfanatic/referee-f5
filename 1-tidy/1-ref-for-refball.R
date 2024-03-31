@@ -10,7 +10,8 @@ if (!dir.exists(local_dir)) dir.create(local_dir, recursive = T)
 
 # Connect to or start the DB
 duck_con <- dbConnect(
-  duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  # duckdb(dbdir = str_glue("{local_dir}/ref5.duckdb"))
+  duckdb(dbdir = str_glue("{local_dir}/shufinskiy.duckdb"))
 )
 
 duck_types_cross <- c("character" = "VARCHAR",
@@ -143,7 +144,7 @@ datanba_calls |>
   select(season, season_prefix,
          all_of(shiny_ref_vars)) |> 
   mutate(across(everything(), ~replace_na(.x, 0))) |> 
-  write_csv("2-shiny/refball/datanba_szn_calls.csv")
+  write_csv("2-shiny/refball/datanba_szn_calls_shufinskiy.csv")
 
 ggplot_vars <- c(Referee = "official",
                  Games	= "total_games",
@@ -187,7 +188,7 @@ datanba_calls |>
   mutate(season_alpha = ifelse(is.na(season),
                                str_glue("{min(datanba_calls$season)-1}-{max(datanba_calls$season)}"),
                                str_glue("{min(season)-1}-{max(season)}"))) |> 
-  write_csv("2-shiny/refball/datanba_ggplot.csv")
+  write_csv("2-shiny/refball/datanba_ggplot_shufinskiy.csv")
 
 
 # ---- teams --------------------------------------------------------------
@@ -210,4 +211,4 @@ datanba_foul_team_calls |>
             Shooting = sum(mtype_desc == "shooting") / Games,
             Personal = sum(mtype_desc == "personal") / Games,
             Technical = sum(mtype_desc == "technical") / Games) |> 
-  write_csv("2-shiny/refball/datanba_ref_teams.csv")
+  write_csv("2-shiny/refball/datanba_ref_teams_shufinskiy.csv")
