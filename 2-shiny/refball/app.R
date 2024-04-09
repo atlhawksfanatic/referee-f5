@@ -11,7 +11,8 @@ library(DT)
 
 # custom ggplot2 theme
 theme_owen <- function (...) { 
-  theme_minimal(base_size=9, base_family="Consolas") %+replace% 
+  theme_minimal(base_size = 20,
+                base_family = "Consolas") %+replace% 
     theme(...,
           panel.grid.minor = element_blank(),
           plot.background = element_rect(fill = 'floralwhite',
@@ -36,7 +37,9 @@ gg_referee <- function(dataset, x_ref, x_szn) {
     geom_point(aes(color = highlight, alpha = Games),
                position = position_jitter(w = 0, h = 0.05), size = 3) +
     geom_label(aes(label = labelz),
-               nudge_y = -0.25, size = 2, color = "black") +
+               nudge_y = -0.25,
+               size = 4,
+               color = "black") +
     geom_vline(xintercept = 0, linetype = "dotted") +
     geom_segment(data = gg_arrows, aes(x, y, xend = xend, yend = yend),
                  arrow = arrow(length = unit(0.25, "cm"))) +
@@ -131,7 +134,9 @@ ui <- page_navbar(
               column(width = 2, selectInput("season_alpha", "Season:", szn_opts)),
               column(width = 2, selectInput("referee", "Referee:", referee_opts))
             ),
-            plotOutput("gg_one"),
+            fluidRow(
+              plotOutput("gg_one", height = "700px")
+            ),
             dataTableOutput("gg_data")),
   
   nav_panel(title = "Referee & Team Combinations",
