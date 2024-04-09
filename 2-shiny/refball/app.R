@@ -109,9 +109,11 @@ ui <- page_navbar(
               column(width = 1, selectInput("season_alpha", "Season:", szn_opts)),
               column(width = 1, selectInput("season_type", "Season Type:", szn_type_opts)),
               column(width = 1, selectInput("mode", "Mode:", mode_opts)),
-              column(width = 2, downloadButton("download_data", "Download Data"))
+              column(width = 3, downloadButton("download_data", "Download Data"))
             ),
-            dataTableOutput("dynamic")
+            fluidRow(
+            column(6, dataTableOutput("dynamic"))
+            )
             ),
   
   nav_panel(title = "Referee Comparison Tool",
@@ -148,7 +150,9 @@ ui <- page_navbar(
                                             min = 1, max = max(ref_teams$Games),
                                             value = 10))
             ),
-            dataTableOutput("ref_teams")
+            fluidRow(
+              column(7, dataTableOutput("ref_teams"))
+            )
             ),
   nav_spacer(),
   nav_menu(
@@ -169,7 +173,10 @@ server <- function(input, output) {
              season_type == input$season_type,
              mode == input$mode) |> 
       select(Referee:`Too many players technical`)
-  }, options = list(pageLength = 100))
+  }, options = list(pageLength = 100,
+                    info = FALSE,
+                    scrollX = TRUE,
+                    scrollY = "500px"))
   
   ref_gg_server <- reactive({
     ref_gg |> 
@@ -194,7 +201,8 @@ server <- function(input, output) {
       select(Referee, Category = var, "Per Game" = val,
              "League Average" = league_avg,
              "Z-Score" = z)
-  }, options = list(paging = FALSE, searching = FALSE,
+  }, options = list(paging = FALSE,
+                    searching = FALSE,
                     info = FALSE),
   rownames = FALSE)
   
@@ -203,7 +211,8 @@ server <- function(input, output) {
       filter(Games >= input$slider) |> 
       mutate(across(c(-Referee, -Team, -Games),
                     ~round(.x, digits = 2)))
-  }, options = list(pageLength = 100))
+  }, options = list(pageLength = 100,
+                    info = FALSE))
 
 }
 
