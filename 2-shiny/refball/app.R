@@ -175,8 +175,7 @@ server <- function(input, output) {
       select(Referee:`Too many players technical`)
   }, options = list(pageLength = 100,
                     info = FALSE,
-                    scrollX = TRUE,
-                    scrollY = "500px"))
+                    scrollX = TRUE))
   
   ref_gg_server <- reactive({
     ref_gg |> 
