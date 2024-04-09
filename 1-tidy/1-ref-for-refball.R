@@ -70,6 +70,11 @@ datanba_games <- tbl(duck_con, "ref_fouls_datanba") |>
   summarise(total_games = n_distinct(game_id)) |> 
   collect()
 
+max_date <- tbl(duck_con, "ref_fouls") |> 
+  left_join(tbl(duck_con, "game_ids"), by = c("game_id" = "gid")) |>
+  summarise(max_date = max(date)) |> 
+  collect()
+
 # ---- join ---------------------------------------------------------------
 
 # (ref_calls <- bind_rows(ref_foul_calls, ref_violation_calls) |> 
@@ -128,11 +133,41 @@ shiny_ref_vars <- c(Referee = "official",
                     "Too many players technical" =
                       "foul_too_many_players_technical")
 
-datanba_calls |> 
+ref_calls <- datanba_calls |> 
   select(season, season_prefix,
          all_of(shiny_ref_vars)) |> 
   mutate(across(everything(), ~replace_na(.x, 0))) |> 
+  ungroup()
+
+ref_totals <- ref_calls |> 
+  mutate(season_alpha = str_glue("{min(season)-1}-{max(season)}"),
+         season_type = ifelse(season_prefix == "002",
+                              "Regular Season",
+                              "Playoffs")) |> 
+  select(-season_prefix, -season) |> 
+  group_by(season_type, Referee, season_alpha) |> 
+  summarise_all(sum, na.rm = T)
+
+ref_temp <- ref_calls |>
+  mutate(season_alpha = str_glue("{season-1}-{season-2000}"),
+         season_type = ifelse(season_prefix == "002",
+                              "Regular Season",
+                              "Playoffs")) |> 
+  bind_rows(ref_totals) |> 
+  mutate(mode = "Total")
+
+ref_shiny <- ref_temp |> 
+  mutate(across(`Total fouls`:`Too many players technical`,
+                ~round(.x/Games, digits = 2)),
+         mode = "Per Game") |> 
+  bind_rows(ref_temp)
+
+ref_shiny |> 
+  mutate(max_date = max_date$max_date) |> 
   write_csv("2-shiny/refball/datanba_szn_calls_shufinskiy.csv")
+
+# ---- ggplot-data --------------------------------------------------------
+
 
 ggplot_vars <- c(Referee = "official",
                  Games	= "total_games",
@@ -178,7 +213,7 @@ datanba_calls |>
            ifelse(is.na(season),
                   str_glue("{min(datanba_calls$season)-1}-",
                            "{max(datanba_calls$season)}"),
-                  str_glue("{min(season)-1}-{max(season)}"))) |>
+                  str_glue("{min(season)-1}-{max(season)-2000}"))) |>
   write_csv("2-shiny/refball/datanba_ggplot_shufinskiy.csv")
 
 
