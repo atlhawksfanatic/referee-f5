@@ -6,6 +6,7 @@ library(httr2)
 library(lubridate)
 library(rvest)
 library(tidyverse)
+library(duckdb)
 
 local_dir   <- "0-data/stats_nba"
 data_source <- paste0(local_dir, "/raw")
@@ -13,6 +14,16 @@ id_source   <- paste0(data_source, "/game_ids")
 if (!file.exists(local_dir)) dir.create(local_dir, recursive = T)
 if (!file.exists(data_source)) dir.create(data_source, recursive = T)
 if (!file.exists(id_source)) dir.create(id_source, recursive = T)
+
+# ignore the downloaded info...
+filecon <- file(paste0(local_dir, "/.gitignore"))
+writeLines("raw", filecon)
+close(filecon)
+
+# Connect to or start the DB
+duck_con <- dbConnect(
+  duckdb(dbdir = str_glue("0-data/duckdb/ref5.duckdb"))
+)
 
 # ---- nba-stats-api ------------------------------------------------------
 
@@ -118,7 +129,7 @@ yoffs_id_range <- str_pad(seq(0041400101, 0041400406), 10, "left", "0")
 
 # ---- queries ------------------------------------------------------------
 
-yoffs_2015_file <- paste0(id_source, "/game_ids_2015_playoffs.csv")
+yoffs_2015_file <- paste0(local_dir, "/game_ids_2015_playoffs.csv")
 
 # The 2015 Playoffs Query
 if (file.exists(yoffs_2015_file)) {
